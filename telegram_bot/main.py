@@ -15,6 +15,7 @@ chat_list = []
 
 def start_watch(update: Update, context: CallbackContext):
   chat = update.effective_chat.id
+  print("someone typed to the chat")
   bot.send_message(
         chat_id = chat,
         text = "hello again",
