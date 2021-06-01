@@ -9,13 +9,6 @@ from my_apis import  *
 tz = timezone("America/Lima")
 t_morning = time(6,1,tzinfo=tz)
 t_noon = time(13,1,tzinfo=tz)
-# Initialize the telegram bot
-# bot = Bot(TELEGRAM_TOKEN)
-# print(bot.get_me())
-
-# updater = Updater(TELEGRAM_TOKEN, use_context=True)
-# dispatcher = updater.dispatcher
-# weather_list = []
 
 # Enable logging
 logging.basicConfig(
@@ -23,36 +16,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-# def notify_weather():
-#   if len(weather_list)>0:
-#     prediction = get_weather()
-#     for chat in weather_list:
-#       bot.send_message(
-#           chat_id = chat,
-#           text = prediction,
-#       )
-
-# def start_watch(update: Update, context: CallbackContext):
-#   chat = update.effective_chat.id
-#   bot.send_message(
-#         chat_id = chat,
-#         text = "hello again",
-#     )
-
-# def start_weather(update: Update, context: CallbackContext):
-#   chat = update.effective_chat.id
-#   #todo: a function that checks if the chat has already been appended
-#   if chat not in weather_list:
-#     weather_list.append(chat) 
-#   bot.send_message(
-#         chat_id = chat,
-#         text = get_weather(),
-#     )
-
-# start_price_watch = CommandHandler('start',start_watch)
-
-# start_weather_watch = CommandHandler('weather',start_weather)
 
 def start(update: Update, _: CallbackContext) -> None:
     """Sends explanation on how to use the bot."""
@@ -76,7 +39,7 @@ def remove_job_if_exists(name: str, context: CallbackContext) -> bool:
     return True
 
 
-def set_timer(update: Update, context: CallbackContext) -> None:
+def set_daily_weather(update: Update, context: CallbackContext) -> None:
     """Add a job to the queue."""
     chat_id = update.message.chat_id
     try:
@@ -104,7 +67,11 @@ def set_timer(update: Update, context: CallbackContext) -> None:
 def unset(update: Update, context: CallbackContext) -> None:
     """Remove the job if the user changed their mind."""
     chat_id = update.message.chat_id
-    job_removed = remove_job_if_exists(str(chat_id), context)
+
+    job_morning = str(chat_id)+"morning"
+    job_noon = str(chat_id)+"noon"
+    job_removed = remove_job_if_exists(job_morning, context)
+    job_removed = remove_job_if_exists(job_noon, context)
     text = 'Timer successfully cancelled!' if job_removed else 'You have no active timer.'
     update.message.reply_text(text)
 
@@ -124,7 +91,7 @@ def main():
   # on different commands - answer in Telegram
   dispatcher.add_handler(CommandHandler("start", start))
   dispatcher.add_handler(CommandHandler("help", start))
-  dispatcher.add_handler(CommandHandler("set", set_timer))
+  dispatcher.add_handler(CommandHandler("set", set_daily_weather))
   dispatcher.add_handler(CommandHandler("unset", unset))
 
   # Start the Bot
