@@ -1,5 +1,5 @@
 /eth_watch
 /.vscode
-/teleg_env
+/venv
 *__pycache__
 *my_keys.py
