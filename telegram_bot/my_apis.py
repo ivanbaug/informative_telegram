@@ -44,7 +44,7 @@ def entryd_to_date(date_str: str) -> datetime:
     return datetime.strptime(date_str, '%d %b %Y %H:%M:%S')
 
 
-def get_rss_feed():
+def get_rss_feed() -> tuple[bool, str]:
     NewsFeed = feedparser.parse(FEED_URL)
 
     # Get the latest date of an entry recorded by this script
