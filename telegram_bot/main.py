@@ -1,5 +1,5 @@
 import logging
-from datetime import time, datetime, timedelta
+from datetime import time
 from pytz import timezone
 from telegram import Update
 from telegram.ext import Updater, CommandHandler,  CallbackContext, Filters, MessageHandler
@@ -62,14 +62,10 @@ def set_blog_watch_job(update: Update, context: CallbackContext) -> None:
     try:
         job_blog = str(chat_id)+"blog"
         job_removed = remove_job_if_exists(job_blog, context)
-        # context.job_queue.run_daily(
-        #     blog_update, time=t_night, context=chat_id, name=job_blog)
-        delta = timedelta(seconds=10)
-        # test_time = datetime.combine(datetime.now(), delta).time()
-        test_time = (datetime.now() + delta).time()
-        print(test_time)
-        context.job_queue.run_once(
-            blog_update, when=delta, context=chat_id, name=job_blog)
+        context.job_queue.run_daily(
+            blog_update, time=t_night, context=chat_id, name=job_blog)
+        # context.job_queue.run_once(
+        #     blog_update, when=delta, context=chat_id, name=job_blog)
         text = 'Blog watch successfully set!'
         if job_removed:
             text += ' Old one was removed.'
@@ -84,11 +80,6 @@ def set_daily_weather_job(update: Update, context: CallbackContext) -> None:
     """Add a job to the queue."""
     chat_id = update.message.chat_id
     try:
-        # args[0] should contain the time for the timer in seconds
-        # due = int(context.args[0])
-        # if due < 0:
-        #     update.message.reply_text('Sorry we can not go back to future!')
-        #     return
         job_morning = str(chat_id)+"morning"
         job_noon = str(chat_id)+"noon"
         job_removed = remove_job_if_exists(job_morning, context)
@@ -146,9 +137,7 @@ def main():
     dispatcher.add_handler(CommandHandler("options", options))
     dispatcher.add_handler(CommandHandler("setw", set_daily_weather_job))
     dispatcher.add_handler(CommandHandler("unsetw", unset_weather_job))
-    dispatcher.add_handler(CommandHandler(
-        "setblog", set_blog_watch_job))  # Retry with this later
-    # dispatcher.add_handler(CommandHandler("setblog", blog_update))
+    dispatcher.add_handler(CommandHandler("setblog", set_blog_watch_job))
     dispatcher.add_handler(CommandHandler("unsetblog", unset_blog_watch_job))
 
     # on non command i.e message - echo the message on Telegram
