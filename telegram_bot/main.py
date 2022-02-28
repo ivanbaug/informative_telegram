@@ -27,8 +27,23 @@ def options(update: Update, _: CallbackContext) -> None:
         "Use /unsetw to cancel the weather updates\n" \
         "Use /setblog to watch if there are new posts in the evening\n" \
         "Use /unsetblog to cancel the blog watch\n" \
-        "bye :)"
+        "Use /getblog to check for blog updates\n" \
+        "Use /getw to get weather update\n" \
+        "Have fun :)"
     update.message.reply_text(long_msg)
+
+
+def get_blog(update: Update, _: CallbackContext) -> None:
+    """Checks for blog update and returns it immediately"""
+    new_posts, my_text = get_rss_feed()
+    if new_posts:
+        update.message.reply_text(my_text)
+
+
+def get_my_weather(update: Update, _: CallbackContext) -> None:
+    """Checks for weather update and returns it immediately"""
+    my_text = get_weather()
+    update.message.reply_text(my_text)
 
 
 def blog_update(context: CallbackContext) -> None:
@@ -139,6 +154,8 @@ def main():
     dispatcher.add_handler(CommandHandler("unsetw", unset_weather_job))
     dispatcher.add_handler(CommandHandler("setblog", set_blog_watch_job))
     dispatcher.add_handler(CommandHandler("unsetblog", unset_blog_watch_job))
+    dispatcher.add_handler(CommandHandler("getblog", get_blog))
+    dispatcher.add_handler(CommandHandler("getw", get_my_weather))
 
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(
