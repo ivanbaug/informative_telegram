@@ -1,0 +1,10 @@
+version: "3"
+services:
+  info_tlgrm:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: info_tlgrm
+    environment:
+      - PYTHONUNBUFFERED=1
