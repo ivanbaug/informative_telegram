@@ -1,11 +1,13 @@
-import requests
+import httpx
 import feedparser
 from datetime import datetime
-from my_keys import *
+from settings.config import WEATHER_KEY, FEED_URL, ServiceType, db_file, IsActive
+from tgbot.models import TChat, TService
+import db.db_funcs as dbf
 
 
 def get_weather():
-    OWM_Endpoint = "https://api.openweathermap.org/data/2.5/onecall"
+    owm_endpoint = "https://api.openweathermap.org/data/2.5/onecall"
     weather_params = {
         "lat": 4.62,
         "lon": -74.06,
@@ -13,7 +15,7 @@ def get_weather():
         "exclude": "current,minutely,daily",
         "units": "metric",
     }
-    response = requests.get(OWM_Endpoint, params=weather_params)
+    response = httpx.get(owm_endpoint, params=weather_params)
     response.raise_for_status()
     # get the next 8 hours of forecast to notify myself if it will rain
     response_json = response.json()
@@ -44,17 +46,21 @@ def entryd_to_date(date_str: str) -> datetime:
     return datetime.strptime(date_str, '%d %b %Y %H:%M:%S')
 
 
-def get_rss_feed() -> tuple[bool, str]:
+def get_rss_feed(chat_id:int) -> tuple[bool, str]:
     NewsFeed = feedparser.parse(FEED_URL)
 
     # Get the latest date of an entry recorded by this script
-    with open('last_date.txt', 'r') as file:
-        last_date_str = file.readline()
-        last_date = datetime.strptime(last_date_str, '%Y-%m-%d %H:%M:%S')
+    row = dbf.get_service_by_chatid(db_file, str(chat_id), ServiceType.BLOG.value)
+    if not row:
+        raise ValueError(f"Blog service not found in database.")
+
+    tservice = TService(row)
+
 
     # Take the top 10 entries and check whether they are new
     new_entry_count = 0
     msg_text = ""
+    last_date = tservice.last_updated
     new_date = last_date
 
     for e in NewsFeed.entries[:10]:
@@ -63,7 +69,6 @@ def get_rss_feed() -> tuple[bool, str]:
             new_entry_count += 1
             line = f"{entry_date} # {e['title']}\n"
             msg_text += line
-            # print(line)
             # Record the most recent date to log it in a file at the end of
             # the process
             if entry_date > new_date:
@@ -75,7 +80,6 @@ def get_rss_feed() -> tuple[bool, str]:
         msg = 'There are no new entries.'
 
     if new_entry_count:
-        with open('last_date.txt', 'w') as file:
-            file.write(datetime.strftime(new_date, '%Y-%m-%d %H:%M:%S'))
+        dbf.add_or_upd_service(db_file, str(tservice.id_chat), tservice.id_type, IsActive.YES, last_updated=new_date)
 
-    return (new_entry_count > 0, msg)
+    return new_entry_count > 0, msg
