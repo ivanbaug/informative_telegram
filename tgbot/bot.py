@@ -158,8 +158,30 @@ async def options(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
                "Use /unsetblog to cancel the blog watch\n" \
                "Use /getblog to check for blog updates\n" \
                "Use /getw to get weather update\n" \
+               "Use /forgetme deactivate current chat and its services\n" \
                "Have fun :)"
     await update.message.reply_text(long_msg)
+
+async def deactivate_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Marks chat and its services as inactive."""
+    chat_id = update.message.chat_id
+
+    # Persist
+    rows = dbf.get_active_services_from_chat(db_file, str(chat_id))
+    tservices = [TService(row) for row in rows]
+
+    for service in tservices:
+        if service.id_type == ServiceType.WEATHER.value:
+            await unset_weather_job(update, context)
+        if service.id_type == ServiceType.BLOG.value:
+            await unset_blog_watch_job(update, context)
+
+        dbf.add_or_upd_service(db_file, str(chat_id), service.id_type, IsActive.NO,
+                               optional_url=service.optional_url, last_updated=service.last_updated)
+
+    dbf.add_or_upd_chat(db_file, str(chat_id), IsActive.NO)
+
+    await update.message.reply_text("Your you have successfully deactivated the chat and it's associated services.")
 
 
 def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -176,22 +198,13 @@ async def simple_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Basic reply"""
     # Save chat id and set it to active
     chat_id = update.effective_message.chat_id
-    dbf.add_or_upd_chat(db_file, str(chat_id), 1)
+    dbf.add_or_upd_chat(db_file, str(chat_id), IsActive.YES)
 
     await update.message.reply_text("Hi! To view the options type /options ")
 
 
 def get_job_name(chat_id: int, job_type: str) -> str:
     return str(chat_id) + job_type
-
-
-def later(application: Application, chat_id: int, job_type: str, delta: int) -> None:
-    """Add a job to the queue."""
-    try:
-        job_name = str(chat_id) + job_type
-        application.job_queue.run_once(weather_update, when=delta, context=chat_id, name=job_name)
-    except (IndexError, ValueError):
-        pass
 
 
 def load_saved_jobs(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -241,18 +254,15 @@ def main():
     application.add_handler(CommandHandler("unsetblog", unset_blog_watch_job))
     application.add_handler(CommandHandler("getw", get_my_weather))
     application.add_handler(CommandHandler("getblog", get_blog))
+    application.add_handler(CommandHandler("forgetme", deactivate_chat))
 
-
-    # on non command i.e message - return list of command options
+    # On non command i.e. message - return list of command options
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, simple_reply))
 
+    # Load saved jobs
     load_saved_jobs(CallbackContext(application))
 
-    # TODO: Add a handler to forget a chat or services
-
-
     # Run the bot until the user presses Ctrl-C
-
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
