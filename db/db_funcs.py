@@ -1,7 +1,7 @@
 import datetime
 import sqlite3
 from contextlib import contextmanager
-from settings.config import log_config, ServiceType, IsActive
+from settings.config import log_config, ServiceType
 import logging
 from logging import config as logging_config
 
@@ -95,7 +95,7 @@ def add_or_upd_service(db_filepath: str, id_chat: str, id_type: int, active: int
             cursor.execute("SELECT * FROM service WHERE id_chat=? AND id_type=? AND optional_url=?",
                            (id_chat, id_type, optional_url))
             first_row = cursor.fetchall()[0]
-            upd_id = first_row[0] # this is a tuple and the id is the first element
+            upd_id = first_row[0]  # this is a tuple and the id is the first element
             cursor.execute("UPDATE service SET id_chat=?, id_type=?, active=?, last_updated=?, "
                            "optional_url=? WHERE id=?", (id_chat, id_type, active, last_updated, optional_url, upd_id))
         lastrowid = cursor.lastrowid
@@ -112,12 +112,23 @@ def get_active_chat_list(db_filepath: str) -> list:
     return rows
 
 
-def get_active_services_from_chat(db_filepath: str, id_chat:str) -> list:
+def get_active_services_from_chat(db_filepath: str, id_chat: str) -> list:
     """
     Query all rows in the service table that are labeled as active for a specific chat
     """
     with db_ops(db_filepath) as cursor:
         cursor.execute("SELECT * FROM service WHERE active=1 AND id_chat=?", (id_chat,))
+        rows = cursor.fetchall()
+    return rows
+
+
+def get_active_manga_by_chat(db_filepath: str, id_chat: str) -> list:
+    """
+    Query all rows in the service table that are labeled as active for a specific chat
+    """
+    with db_ops(db_filepath) as cursor:
+        cursor.execute("SELECT * FROM service WHERE active=1 AND id_type=? "
+                       " AND  id_chat=?", (ServiceType.DEX.value, id_chat))
         rows = cursor.fetchall()
     return rows
 
@@ -131,62 +142,16 @@ def get_service_by_chatid(db_filepath: str, id_chat: str, id_type: int) -> tuple
         rows = cursor.fetchall()
     if len(rows) > 0:
         return rows[0]
-    return None
+    return ()
 
-def get_pages(db_filepath: str) -> list:
+
+def remove_manga(db_filepath: str, id_chat: str,  manga_id: str) -> int:
     """
-    Query all rows in the pages table
-    :return: list of pages
+    Remove a manga from the service table
     """
+    rows_affected = 0
     with db_ops(db_filepath) as cursor:
-        cursor.execute("SELECT * FROM sigma_pages")
-        rows = cursor.fetchall()
-    return rows
-
-
-def get_products(db_filepath: str) -> list:
-    """
-    Query all rows in the products table
-    :return: list of products
-    """
-    with db_ops(db_filepath) as cursor:
-        cursor.execute("SELECT * FROM sigma_products")
-        rows = cursor.fetchall()
-    return rows
-
-
-def get_pages_last_updated(db_filepath: str) -> datetime.datetime | None:
-    """
-    Query all rows in the pages table
-    :return: NAIVE datetime of last updated page
-    """
-    with db_ops(db_filepath) as cursor:
-        cursor.execute("SELECT last_updated FROM sigma_pages ORDER BY last_updated DESC LIMIT 1")
-        rows = cursor.fetchall()
-    if rows:
-        return rows[0][0]
-    return None
-
-
-def get_products_last_updated(db_filepath: str) -> datetime.datetime | None:
-    """
-    Query all rows in the products table
-    :return: datetime of last updated product
-    """
-    with db_ops(db_filepath) as cursor:
-        cursor.execute("SELECT last_updated FROM sigma_products ORDER BY last_updated DESC LIMIT 1")
-        rows = cursor.fetchall()
-    if rows:
-        return rows[0][0]
-    return None
-
-
-def delete_product(db_filepath: str, url: str) -> None:
-    """
-    Delete a product by url
-    :param db_filepath:
-    :param url:
-    :return:
-    """
-    with db_ops(db_filepath) as cursor:
-        cursor.execute("DELETE FROM sigma_products WHERE url=?", (url,))
+        cursor.execute("DELETE FROM service WHERE id_chat=? AND id_type=? AND optional_url=?",
+                       (id_chat, ServiceType.DEX.value, manga_id))
+        rows_affected = cursor.rowcount
+    return rows_affected

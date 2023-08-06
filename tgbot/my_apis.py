@@ -2,7 +2,7 @@ import httpx
 import feedparser
 from datetime import datetime
 from settings.config import WEATHER_KEY, FEED_URL, ServiceType, db_file, IsActive
-from tgbot.models import TChat, TService
+from tgbot.models import TService
 import db.db_funcs as dbf
 
 
@@ -28,11 +28,11 @@ def get_weather():
         # dt = datetime.utcfromtimestamp(unixtime).strftime('%Y-%m-%d %H:%M:%S')
         time = datetime.utcfromtimestamp(unixtime).strftime('%I%p')
         forecast = f['weather'][0]
-        id = int(forecast['id'])
+        forecast_id = int(forecast['id'])
         main_fc = forecast['main']
         description_fc = forecast['description']
         comment = ""
-        if id < 700:
+        if forecast_id < 700:
             comment = " ☔"
         forecast_str += f"{time} | {description_fc}{comment}\n"
     return forecast_str
@@ -46,8 +46,8 @@ def entryd_to_date(date_str: str) -> datetime:
     return datetime.strptime(date_str, '%d %b %Y %H:%M:%S')
 
 
-def get_rss_feed(chat_id:int) -> tuple[bool, str]:
-    NewsFeed = feedparser.parse(FEED_URL)
+def get_rss_feed(chat_id: int) -> tuple[bool, str]:
+    news_feed = feedparser.parse(FEED_URL)
 
     # Get the latest date of an entry recorded by this script
     row = dbf.get_service_by_chatid(db_file, str(chat_id), ServiceType.BLOG.value)
@@ -56,14 +56,13 @@ def get_rss_feed(chat_id:int) -> tuple[bool, str]:
 
     tservice = TService(row)
 
-
     # Take the top 10 entries and check whether they are new
     new_entry_count = 0
     msg_text = ""
     last_date = tservice.last_updated
     new_date = last_date
 
-    for e in NewsFeed.entries[:10]:
+    for e in news_feed.entries[:10]:
         entry_date = entryd_to_date(e['published'])
         if entry_date > last_date:
             new_entry_count += 1
@@ -83,3 +82,68 @@ def get_rss_feed(chat_id:int) -> tuple[bool, str]:
         dbf.add_or_upd_service(db_file, str(tservice.id_chat), tservice.id_type, IsActive.YES, last_updated=new_date)
 
     return new_entry_count > 0, msg
+
+
+# Dex
+def get_mangadex(manga_id: str, last_updated: datetime, chat_id: int):
+    # Api documentation: https://api.mangadex.org/docs/
+
+    base_url = "https://api.mangadex.org"
+    options = "?limit=5&includeFuturePublishAt=0&order[publishAt]=desc"
+    languages = ["en", "es", "es-la"]
+    str_languages = "&translatedLanguage[]=" + "&translatedLanguage[]=".join(languages)
+    publish_since = "&publishAtSince=" + last_updated.strftime("%Y-%m-%dT%H:%M:%S")
+    options += str_languages + publish_since
+    r = httpx.get(f"{base_url}/manga/{manga_id}/feed{options}")
+    r.raise_for_status()
+
+    rdata = r.json()
+    if rdata["result"].lower() != "ok":
+        msg = f"{manga_id} error: \n"
+        msg += get_dex_error_msg(rdata)
+        return msg
+
+    if rdata["total"] == 0:
+        return ""
+
+    new_date: datetime = last_updated
+
+    result_str = f"New chapters for {manga_id}:\n"
+    for chapter in rdata["data"]:
+        publish_at = datetime.strptime(chapter["attributes"]["publishAt"][0:19], "%Y-%m-%dT%H:%M:%S")
+        if publish_at > new_date:
+            new_date = publish_at
+        result_str += f"Ch:{chapter['attributes']['chapter']} - Title:{chapter['attributes']['title']}\n"
+        result_str += (f"Language:{chapter['attributes']['translatedLanguage']} "
+                       f"Date:{chapter['attributes']['publishAt'][0:19]}\n")
+        result_str += f"Link: https://mangadex.org/chapter/{chapter['id']}\n\n"
+
+    # Update service
+    dbf.add_or_upd_service(db_file, str(chat_id), ServiceType.DEX.value,
+                           IsActive.YES, last_updated=new_date, optional_url=manga_id)
+
+    return result_str
+
+
+async def check_manga_exists(manga_id: str):
+    base_url = "https://api.mangadex.org"
+    r = httpx.get(f"{base_url}/manga/{manga_id}")
+    rdata = r.json()
+    if 'result' not in rdata:
+        return False, "Unexpected response from server"
+
+    if rdata["result"].lower() != "ok":
+        return False, get_dex_error_msg(rdata)
+
+    title = list(rdata["data"]["attributes"]["title"].values())[0]
+    return True, f"Manga {title} found!"
+
+
+def get_dex_error_msg(rdata: dict):
+    msg = "Request not ok \n"
+    if rdata["result"].lower() == "error":
+        msg += f"Error code: {rdata['errors'][0]['status']}\n"
+        msg += f"Error message: {rdata['errors'][0]['detail']}\n"
+        return msg
+
+    return msg + f"Result: {rdata['result']}\n"
