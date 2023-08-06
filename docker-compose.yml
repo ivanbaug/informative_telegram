@@ -6,5 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: info_tlgrm
+    volumes:
+      - vol_telegram:/var/vol_telegram
     environment:
       - PYTHONUNBUFFERED=1
+volumes:
+  vol_telegram:
+    external: true

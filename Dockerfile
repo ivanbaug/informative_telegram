@@ -1,10 +1,13 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-COPY ./telegram_bot ./telegram_bot
-COPY last_date.txt last_date.txt
+COPY db/ db/
+COPY settings/ settings/
+COPY tgbot ./telegram_bot
+COPY .env .env
+COPY main.py main.py
 
-CMD [ "python", "-u", "./telegram_bot/main.py" ]
+CMD [ "python", "-u", "main.py" ]
