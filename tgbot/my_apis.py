@@ -1,6 +1,6 @@
 import httpx
 import feedparser
-from datetime import datetime
+from datetime import datetime, timedelta
 from settings.config import WEATHER_KEY, FEED_URL, ServiceType, db_file, IsActive
 from tgbot.models import TService
 import db.db_funcs as dbf
@@ -119,8 +119,9 @@ def get_mangadex(manga_id: str, last_updated: datetime, chat_id: int):
         result_str += f"Link: https://mangadex.org/chapter/{chapter['id']}\n\n"
 
     # Update service
+    lu = new_date + timedelta(seconds=1)  # Add 1 second to avoid repeating the last chapter in query
     dbf.add_or_upd_service(db_file, str(chat_id), ServiceType.DEX.value,
-                           IsActive.YES, last_updated=new_date, optional_url=manga_id)
+                           IsActive.YES, last_updated=lu, optional_url=manga_id)
 
     return result_str
 
