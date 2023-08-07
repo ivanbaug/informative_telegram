@@ -17,8 +17,7 @@ tz = timezone("America/Lima")
 
 TIME_MORNING = time(6, 1, tzinfo=tz)
 TIME_NOON = time(13, 1, tzinfo=tz)
-# TIME_NIGHT = time(18, 30, tzinfo=tz)
-TIME_NIGHT = time(20, 10, tzinfo=tz)
+TIME_NIGHT = time(18, 30, tzinfo=tz)
 
 
 MORNING = "MORNING"
