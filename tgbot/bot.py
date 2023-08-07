@@ -17,7 +17,8 @@ tz = timezone("America/Lima")
 
 TIME_MORNING = time(6, 1, tzinfo=tz)
 TIME_NOON = time(13, 1, tzinfo=tz)
-TIME_NIGHT = time(18, 30, tzinfo=tz)
+# TIME_NIGHT = time(18, 30, tzinfo=tz)
+TIME_NIGHT = time(20, 10, tzinfo=tz)
 
 
 MORNING = "MORNING"
@@ -179,7 +180,7 @@ async def set_dex_watch_job(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
         job_dex = get_job_name(chat_id, ServiceType.DEX.name)
         job_removed = remove_job_if_exists(job_dex, context)
-        context.job_queue.run_daily(get_dex_updates, time=TIME_NIGHT, chat_id=chat_id, name=job_dex)
+        context.job_queue.run_daily(dex_updates, time=TIME_NIGHT, chat_id=chat_id, name=job_dex)
         text = 'Dex watch successfully set!'
         if job_removed:
             text += ' Old one was removed.'
@@ -193,15 +194,28 @@ async def set_dex_watch_job(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await update.message.reply_text('Failed to set a dex watch job')
 
 
-async def get_dex_updates(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+async def get_dex_upd(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     """Check if there is an update on the feed and notifies it."""
-    chat_id = update.effective_message.chat_id
+    chat_id = update.message.chat_id
     rows = dbf.get_active_manga_by_chat(db_file, str(chat_id))
     services = [TService(row) for row in rows]
     mangas = await asyncio.gather(*(chain_manga(idx, service) for idx, service in enumerate(services)))
     for manga in mangas:
         if manga:
             await update.message.reply_text(manga)
+    return
+
+
+async def dex_updates(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Check if there is an update on the feed and notifies it."""
+    job = context.job
+    chat_id = job.chat_id
+    rows = dbf.get_active_manga_by_chat(db_file, str(chat_id))
+    services = [TService(row) for row in rows]
+    mangas = await asyncio.gather(*(chain_manga(idx, service) for idx, service in enumerate(services)))
+    for manga in mangas:
+        if manga:
+            await context.bot.send_message(job.chat_id, text=manga)
     return
 
 
@@ -351,7 +365,7 @@ def load_saved_jobs(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 job_dex = get_job_name(chat_id, ServiceType.DEX.name)
                 job_removed = remove_job_if_exists(job_dex, context)
-                context.job_queue.run_daily(blog_update, time=TIME_NIGHT, chat_id=chat_id, name=job_dex)
+                context.job_queue.run_daily(dex_updates, time=TIME_NIGHT, chat_id=chat_id, name=job_dex)
             except (IndexError, ValueError):
                 logger.error("Failed to set a dex watch job")
 
@@ -395,7 +409,7 @@ def main():
     application.add_handler(CommandHandler("setdex", set_dex_watch_job))
     application.add_handler(CommandHandler("unsetmanga", unset_manga_watch_job))
     application.add_handler(CommandHandler("unsetdex", unset_dex_watch_job))
-    application.add_handler(CommandHandler("getdexupdates", get_dex_updates))
+    application.add_handler(CommandHandler("getdexupdates", get_dex_upd))
     application.add_handler(CommandHandler("getmangalist", get_manga_list))
 
     # On non command i.e. message - return list of command options
